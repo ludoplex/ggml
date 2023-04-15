@@ -127,6 +127,17 @@ set(CMAKE_CXX_STANDARD 11)
 
 find_package(Threads REQUIRED)
 
+if (APPLE AND LLAMA_ACCELERATE)
+    find_library(ACCELERATE_FRAMEWORK Accelerate)
+    if (ACCELERATE_FRAMEWORK)
+        message(STATUS "Accelerate framework found")
+
+        add_compile_definitions(GGML_USE_ACCELERATE)
+        set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} ${ACCELERATE_FRAMEWORK})
+    else()
+        message(WARNING "Accelerate framework not found")
+    endif()
+endif()
 if (LLAMA_OPENBLAS)
     if (LLAMA_STATIC)
         set(BLA_STATIC ON)
