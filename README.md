@@ -28,6 +28,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of LLaMA inference [ggerganov/llama.cpp](https://github.com/ggerganov/llama.cpp)
 - [X] Example of RWKV inference [saharNooby/rwkv.cpp](https://github.com/saharNooby/rwkv.cpp)
 - [ ] Example of [SAM](https://github.com/facebookresearch/segment-anything) inference
+- [ ] Idea for GPU support: https://github.com/ggerganov/llama.cpp/discussions/915
 
 ## Whisper inference (example)
 
@@ -67,7 +68,7 @@ make -j4 gpt-2 gpt-j
 
 # Run the Cerebras-GPT 111M model
 # Download from: https://huggingface.co/cerebras
-python3 ./examples/gpt-2/convert-cerebras-to-ggml.py /path/to/Cerebras-GPT-111M/
+python3 ../examples/gpt-2/convert-cerebras-to-ggml.py /path/to/Cerebras-GPT-111M/
 ./bin/gpt-2 -m /path/to/Cerebras-GPT-111M/ggml-model-f16.bin -p "This is an example"
 ```
 

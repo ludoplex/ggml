@@ -13,6 +13,8 @@ else()
     set(GGML_STANDALONE OFF)
 endif()
 
+CMAKE_C_FLAGS
+
 # options
 
 option(GGML_ALL_WARNINGS            "ggml: enable all compiler warnings"                   ON)
