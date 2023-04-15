@@ -216,6 +216,6 @@ int main(int argc, char** argv) {
         return res;
     });
 
-    app.port(18080).run();
+    app.port(18080).multithreaded().run();
 
 }
