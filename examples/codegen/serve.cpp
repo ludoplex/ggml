@@ -51,7 +51,8 @@ int main(int argc, char** argv) {
     CROW_ROUTE(app, "/copilot_internal/v2/token")([](){
         //return "Hello world";
 
-        crow::json::wvalue response = {{"token","1"}, {"expires_at", 2600000000}, {"refresh_in",900}};
+        crow::json::wvalue response = {{"token","1"}, {"expires_at", static_cast<std::uint64_t>(2600000000)}, {"refresh_in",900}};
+
         crow::response res;
         res.code = 200;
         res.set_header("Content-Type", "application/json");
@@ -64,14 +65,28 @@ int main(int argc, char** argv) {
     ([&model, &vocab, &params](const crow::request& req) {
         crow::json::rvalue data = crow::json::load(req.body);
 
-        if(!data.has("prompt")){
+        if(!data.has("prompt") && !data.has("input_ids")){
             crow::response res;
             res.code = 400;
             res.set_header("Content-Type", "application/json");
-            res.body = "{\"message\":\"you must specify a prompt\"}";
+            res.body = "{\"message\":\"you must specify a prompt or input_ids\"}";
             return res;
         }
-        std::string prompt = data["prompt"].s();
+
+        // tokenize the prompt
+        std::vector<gpt_vocab::id> embd_inp;
+        if (data.has("prompt")) {
+            std::string prompt = data["prompt"].s();
+            embd_inp = ::codegen_tokenize(vocab, prompt);
+        } else {
+            crow::json::rvalue input_ids = data["input_ids"];
+            for (auto id : input_ids.lo()) {
+                embd_inp.push_back(id.i());
+            }
+        }
+
+        printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
+        printf("\n");
 
         // std::string suffix = data["suffix"].s();
         int maxTokens = 200;
@@ -95,12 +110,6 @@ int main(int argc, char** argv) {
 
 
         std::vector<float> logits;
-
-        // tokenize the prompt
-        std::vector<gpt_vocab::id> embd_inp = ::codegen_tokenize(vocab, prompt);
-
-        printf("%s: number of tokens in prompt = %zu\n", __func__, embd_inp.size());
-        printf("\n");
 
         std::vector<gpt_vocab::id> embd;
 
@@ -188,22 +197,22 @@ int main(int argc, char** argv) {
             {"text", ss.str()},
             {"index",0},
             {"finish_reason", "length"},
-            {"logprobs", NULL}
+            {"logprobs", nullptr}
         };
         crow::json::wvalue::list choices = {choice};
 
 
         crow::json::wvalue usage = {
             {"completion_tokens", n_past},
-            {"prompt_tokens", embd_inp.size()},
-            {"total_tokens", n_past + embd_inp.size()}
+            {"prompt_tokens", static_cast<std::uint64_t>(embd_inp.size())},
+            {"total_tokens", static_cast<std::uint64_t>(n_past + embd_inp.size())}
         };
 
         crow::json::wvalue response = {
             {"id", boost::lexical_cast<std::string>(uuid)},
             {"model", "codegen"},
             {"object","text_completion"},
-            {"created", std::time(NULL)},
+            {"created", static_cast<std::int64_t>(std::time(nullptr))},
             {"choices", choices },
             {"usage", usage}
         };
