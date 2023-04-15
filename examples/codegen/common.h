@@ -8,6 +8,7 @@
 #include <map>
 
 
+const char * codegen_print_system_info(void);
 
 // default hparams (GPT-J 6B)
 struct gptj_hparams {

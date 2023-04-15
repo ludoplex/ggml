@@ -62,6 +62,13 @@ int main(int argc, char ** argv) {
         t_load_us = ggml_time_us() - t_start_us;
     }
 
+    // print system information
+    {
+        fprintf(stderr, "\n");
+        fprintf(stderr, "system_info: n_threads = %d / %d | %s\n",
+                params.n_threads, std::thread::hardware_concurrency(), codegen_print_system_info());
+    }
+
     int n_past = 0;
 
     int64_t t_sample_us  = 0;
