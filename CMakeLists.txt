@@ -13,7 +13,6 @@ else()
     set(GGML_STANDALONE OFF)
 endif()
 
-CMAKE_C_FLAGS
 
 # options
 
