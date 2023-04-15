@@ -15,6 +15,7 @@ endif()
 
 
 # options
+option(LLAMA_STATIC                 "llama: static link libraries"                          OFF)
 
 option(GGML_ALL_WARNINGS            "ggml: enable all compiler warnings"                   ON)
 option(GGML_ALL_WARNINGS_3RD_PARTY  "ggml: enable all compiler warnings in 3rd party libs" OFF)
@@ -46,6 +47,75 @@ if (GGML_SANITIZE_UNDEFINED)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=undefined")
 endif()
 
+
+# instruction set specific
+option(LLAMA_AVX                    "llama: enable AVX"                                     ON)
+option(LLAMA_AVX2                   "llama: enable AVX2"                                    ON)
+option(LLAMA_AVX512                 "llama: enable AVX512"                                  OFF)
+option(LLAMA_FMA                    "llama: enable FMA"                                     ON)
+# in MSVC F16C is implied with AVX2/AVX512
+if (NOT MSVC)
+    option(LLAMA_F16C               "llama: enable F16C"                                    ON)
+endif()
+
+
+if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "arm" OR ${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
+    message(STATUS "ARM detected")
+    if (MSVC)
+        # TODO: arm msvc?
+    else()
+        if (${CMAKE_SYSTEM_PROCESSOR} MATCHES "aarch64")
+            add_compile_options(-mcpu=native)
+        endif()
+        # TODO: armv6,7,8 version specific flags
+    endif()
+elseif (${CMAKE_SYSTEM_PROCESSOR} MATCHES "^(x86_64|i686|AMD64)$")
+    message(STATUS "x86 detected")
+    if (MSVC)
+        if (LLAMA_AVX512)
+            message(STATUS "using AVX512")
+            add_compile_options(/arch:AVX512)
+        elseif (LLAMA_AVX2)
+            message(STATUS "using AVX2")
+            add_compile_options(/arch:AVX2)
+        elseif (LLAMA_AVX)
+            message(STATUS "using AVX")
+            add_compile_options(/arch:AVX)
+        endif()
+    else()
+        if (LLAMA_F16C)
+            message(STATUS "using F16c")
+            add_compile_options(-mf16c)
+        endif()
+        if (LLAMA_FMA)
+            message(STATUS "using FMA")
+            add_compile_options(-mfma)
+        endif()
+        if (LLAMA_AVX)
+            message(STATUS "using AVX")
+            add_compile_options(-mavx)
+        endif()
+        if (LLAMA_AVX2)
+            message(STATUS "using AVX2")
+            add_compile_options(-mavx2)
+        endif()
+        if (LLAMA_AVX512)
+            message(STATUS "using AVX512")
+            add_compile_options(-mavx512f)
+            # add_compile_options(-mavx512cd)
+            # add_compile_options(-mavx512dq)
+            # add_compile_options(-mavx512bw)
+        endif()
+    endif()
+else()
+    # TODO: support PowerPC
+    message(STATUS "Unknown architecture")
+endif()
+
+
+option(LLAMA_OPENBLAS               "llama: use OpenBLAS"                                   OFF)
+
+
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -ffast-math")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mcpu=native")
@@ -56,6 +126,54 @@ set(CMAKE_C_STANDARD   11)
 set(CMAKE_CXX_STANDARD 11)
 
 find_package(Threads REQUIRED)
+
+if (LLAMA_OPENBLAS)
+    if (LLAMA_STATIC)
+        set(BLA_STATIC ON)
+    endif()
+
+    set(BLA_VENDOR OpenBLAS)
+    find_package(BLAS)
+    if (BLAS_FOUND)
+        message(STATUS "OpenBLAS found")
+
+        add_compile_definitions(GGML_USE_OPENBLAS)
+        add_link_options(${BLAS_LIBRARIES})
+        set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} openblas)
+
+        # find header file
+        set(OPENBLAS_INCLUDE_SEARCH_PATHS
+            /usr/include
+            /usr/include/openblas
+            /usr/include/openblas-base
+            /usr/local/include
+            /usr/local/include/openblas
+            /usr/local/include/openblas-base
+            /opt/OpenBLAS/include
+            $ENV{OpenBLAS_HOME}
+            $ENV{OpenBLAS_HOME}/include
+            )
+        find_path(OPENBLAS_INC NAMES cblas.h PATHS ${OPENBLAS_INCLUDE_SEARCH_PATHS})
+        add_compile_options(-I${OPENBLAS_INC})
+    else()
+        message(WARNING "OpenBLAS not found")
+    endif()
+endif()
+
+if (NOT MSVC)
+    if (LLAMA_STATIC)
+        add_link_options(-static)
+        if (MINGW)
+            add_link_options(-static-libgcc -static-libstdc++)
+        endif()
+    endif()
+    if (LLAMA_GPROF)
+        add_compile_options(-pg)
+    endif()
+    if (LLAMA_NATIVE)
+        add_compile_options(-march=native)
+    endif()
+endif()
 
 # main
 
