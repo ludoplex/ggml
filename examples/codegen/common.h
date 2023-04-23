@@ -1,6 +1,5 @@
-#include "utils.h"
 #include "ggml/ggml.h"
-
+#include "../common.h"
 
 #include <string>
 #include <fstream>
