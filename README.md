@@ -29,6 +29,7 @@ Some of the development is currently happening in the [llama.cpp](https://github
 - [X] Example of RWKV inference [saharNooby/rwkv.cpp](https://github.com/saharNooby/rwkv.cpp)
 - [ ] Example of [SAM](https://github.com/facebookresearch/segment-anything) inference
 - [ ] Idea for GPU support: https://github.com/ggerganov/llama.cpp/discussions/915
+- [X] Example of StableLM (GPT-NeoX) inference [examples/stablelm](https://github.com/ggerganov/ggml/tree/master/examples/stablelm)
 
 ## Whisper inference (example)
 
@@ -84,3 +85,10 @@ The inference speeds that I get for the different models on my 32GB MacBook M1 P
 | GPT-J |    6B | 125 ms |
 
 For more information, checkout the corresponding programs in the [examples](examples) folder.
+
+## Using cuBLAS
+
+```bash
+# fix the path to point to your CUDA compiler
+cmake -DGGML_CUBLAS=ON -DCMAKE_CUDA_COMPILER=/usr/local/cuda-12.1/bin/nvcc ..
+```

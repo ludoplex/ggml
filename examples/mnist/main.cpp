@@ -1,6 +1,6 @@
 #include "ggml/ggml.h"
 
-#include "utils.h"
+#include "common.h"
 
 #include <cassert>
 #include <cmath>
@@ -13,6 +13,7 @@
 #include <iostream>
 #include <unistd.h>
 #include <time.h>
+#include <algorithm>
 
 // default hparams
 struct mnist_hparams {

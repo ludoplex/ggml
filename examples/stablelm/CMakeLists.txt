@@ -1,13 +1,13 @@
 #
-# gpt-2
+# stablelm
 
-set(TEST_TARGET gpt-2)
+set(TEST_TARGET stablelm)
 add_executable(${TEST_TARGET} main.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml common)
 
 #
-# gpt-2-quantize
+# stablelm-quantize
 
-set(TEST_TARGET gpt-2-quantize)
+set(TEST_TARGET stablelm-quantize)
 add_executable(${TEST_TARGET} quantize.cpp)
 target_link_libraries(${TEST_TARGET} PRIVATE ggml common common-ggml)
