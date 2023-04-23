@@ -15,19 +15,30 @@
 //
 
 struct gpt_params {
+    // set to true if we are running a perplexity evaluation
+    bool perplexity  = false;
+
     int32_t seed      = -1; // RNG seed
     int32_t n_threads = std::min(4, (int32_t) std::thread::hardware_concurrency());
-    int32_t n_predict = 200; // new tokens to predict
+    int32_t n_predict     = 128;  // new tokens to predict
+    int32_t repeat_last_n = 64;   // last n tokens to penalize
+    int32_t n_parts       = -1;   // amount of model parts (-1 = determine from model dimensions)
+    int32_t n_ctx         = 512;  // context size
+    int32_t n_batch       = 128;  // batch size for prompt processing (must be >=32 to use BLAS)
+    int32_t n_keep        = 0;    // number of tokens to keep from initial prompt
 
     // sampling parameters
     int32_t top_k = 40;
     float   top_p = 0.9f;
     float   temp  = 0.9f;
+    float   repeat_penalty  = 1.10f;
 
-    int32_t n_batch = 8; // batch size for prompt processing
 
     std::string model = "models/gpt-2-117M/ggml-model.bin"; // model path
-    std::string prompt;
+    std::string prompt = "";
+
+    bool memory_f16        = true;  // use f16 instead of f32 for memory kv
+    bool random_prompt     = false; // do not randomize prompt if none provided
 };
 
 bool gpt_params_parse(int argc, char ** argv, gpt_params & params);

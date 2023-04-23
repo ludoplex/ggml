@@ -1,7 +1,7 @@
 #include <iostream>
 #include <sstream>
 #include "crow_all.h"
-#include "common.h"
+#include "codegen.h"
 
 #include <boost/uuid/uuid.hpp>            // uuid class
 #include <boost/uuid/uuid_generators.hpp> // generators
@@ -153,7 +153,7 @@ crow::response serve_response(gpt_params params, gptj_model &model, gpt_vocab &v
         crow::json::wvalue usage = {
             {"completion_tokens", n_past},
             {"prompt_tokens", static_cast<std::uint64_t>(embd_inp.size())},
-            {"total_tokens", static_cast<std::uint64_t>(n_past + embd_inp.size())}
+            {"total_tokens", static_cast<std::uint64_t>(n_past - embd_inp.size())}
         };
 
         crow::json::wvalue response = {

@@ -13,36 +13,146 @@
 #define M_PI 3.14159265358979323846
 #endif
 
+
 bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
+    // determine sensible default number of threads.
+    // std::thread::hardware_concurrency may not be equal to the number of cores, or may return 0.
+#ifdef __linux__
+    std::ifstream cpuinfo("/proc/cpuinfo");
+    params.n_threads = std::count(std::istream_iterator<std::string>(cpuinfo),
+                                  std::istream_iterator<std::string>(),
+                                  std::string("processor"));
+#endif
+    if (params.n_threads == 0) {
+        params.n_threads = std::max(1, (int32_t) std::thread::hardware_concurrency());
+    }
+
+    bool invalid_param = false;
+    std::string arg;
+    gpt_params default_params;
+
     for (int i = 1; i < argc; i++) {
-        std::string arg = argv[i];
+        arg = argv[i];
 
         if (arg == "-s" || arg == "--seed") {
-            params.seed = std::stoi(argv[++i]);
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.seed = std::stoi(argv[i]);
         } else if (arg == "-t" || arg == "--threads") {
-            params.n_threads = std::stoi(argv[++i]);
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.n_threads = std::stoi(argv[i]);
         } else if (arg == "-p" || arg == "--prompt") {
-            params.prompt = argv[++i];
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.prompt = argv[i];
+        } else if (arg == "-f" || arg == "--file") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            std::ifstream file(argv[i]);
+            if (!file) {
+                fprintf(stderr, "error: failed to open file '%s'\n", argv[i]);
+                invalid_param = true;
+                break;
+            }
+            std::copy(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>(), back_inserter(params.prompt));
+            if (params.prompt.back() == '\n') {
+                params.prompt.pop_back();
+            }
         } else if (arg == "-n" || arg == "--n_predict") {
-            params.n_predict = std::stoi(argv[++i]);
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.n_predict = std::stoi(argv[i]);
         } else if (arg == "--top_k") {
-            params.top_k = std::stoi(argv[++i]);
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.top_k = std::stoi(argv[i]);
+        } else if (arg == "-c" || arg == "--ctx_size") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.n_ctx = std::stoi(argv[i]);
+        } else if (arg == "--memory_f32") {
+            params.memory_f16 = false;
         } else if (arg == "--top_p") {
-            params.top_p = std::stof(argv[++i]);
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.top_p = std::stof(argv[i]);
         } else if (arg == "--temp") {
-            params.temp = std::stof(argv[++i]);
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.temp = std::stof(argv[i]);
+        } else if (arg == "--repeat_last_n") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.repeat_last_n = std::stoi(argv[i]);
+        } else if (arg == "--repeat_penalty") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.repeat_penalty = std::stof(argv[i]);
         } else if (arg == "-b" || arg == "--batch_size") {
-            params.n_batch = std::stoi(argv[++i]);
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.n_batch = std::stoi(argv[i]);
+            params.n_batch = std::min(512, params.n_batch);
+        } else if (arg == "--keep") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.n_keep = std::stoi(argv[i]);
         } else if (arg == "-m" || arg == "--model") {
-            params.model = argv[++i];
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.model = argv[i];
+        } else if (arg == "--perplexity") {
+            params.perplexity = true;
+        } else if (arg == "--n_parts") {
+            if (++i >= argc) {
+                invalid_param = true;
+                break;
+            }
+            params.n_parts = std::stoi(argv[i]);
         } else if (arg == "-h" || arg == "--help") {
-            gpt_print_usage(argc, argv, params);
+            gpt_print_usage(argc, argv, default_params);
             exit(0);
+        } else if (arg == "--random-prompt") {
+            params.random_prompt = true;
         } else {
             fprintf(stderr, "error: unknown argument: %s\n", arg.c_str());
-            gpt_print_usage(argc, argv, params);
-            exit(0);
+            gpt_print_usage(argc, argv, default_params);
+            exit(1);
         }
+    }
+    if (invalid_param) {
+        fprintf(stderr, "error: invalid parameter for argument: %s\n", arg.c_str());
+        gpt_print_usage(argc, argv, default_params);
+        exit(1);
     }
 
     return true;
