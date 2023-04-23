@@ -1,4 +1,5 @@
 #include "common.h"
+#include "codegen.h"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
@@ -576,6 +577,7 @@ const char * codegen_print_system_info(void) {
     s += "FP16_VA = "   + std::to_string(ggml_cpu_has_fp16_va())   + " | ";
     s += "WASM_SIMD = " + std::to_string(ggml_cpu_has_wasm_simd()) + " | ";
     s += "BLAS = "      + std::to_string(ggml_cpu_has_blas())      + " | ";
+    s += "CUDA = "      + std::to_string(ggml_cpu_has_cublas())    + " | ";
     s += "SSE3 = "      + std::to_string(ggml_cpu_has_sse3())      + " | ";
     s += "VSX = "       + std::to_string(ggml_cpu_has_vsx())       + " | ";
 

@@ -1,6 +1,6 @@
 #include "ggml/ggml.h"
 
-#include "../common.h"
+#include "common.h"
 
 #include <cassert>
 #include <cmath>
