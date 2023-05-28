@@ -131,31 +131,6 @@ if (APPLE AND NOT GGML_NO_ACCELERATE)
     endif()
 endif()
 
-if (GGML_OPENBLAS)
-    set(OPENBLAS_INCLUDE_SEARCH_PATHS
-        /usr/include
-        /usr/include/openblas
-        /usr/include/openblas-base
-        /usr/local/include
-        /usr/local/include/openblas
-        /usr/local/include/openblas-base
-        /opt/OpenBLAS/include
-        $ENV{OpenBLAS_HOME}
-        $ENV{OpenBLAS_HOME}/include
-        )
-    find_path(OPENBLAS_INC NAMES cblas.h PATHS ${OPENBLAS_INCLUDE_SEARCH_PATHS})
-    find_library(OPENBLAS_LIB NAMES openblas libopenblas)
-    if (OPENBLAS_LIB)
-        message(STATUS "OpenBLAS found")
-
-        set(GGML_EXTRA_LIBS  ${GGML_EXTRA_LIBS}  ${OPENBLAS_LIB})
-        set(GGML_EXTRA_INCS  ${GGML_EXTRA_INCS}  ${OPENBLAS_INC})
-	set(GGML_EXTRA_FLAGS ${GGML_EXTRA_FLAGS} -DGGML_USE_OPENBLAS)
-    else()
-        message(WARNING "OpenBLAS not found")
-    endif()
-endif()
-
 if (GGML_CUBLAS)
     cmake_minimum_required(VERSION 3.17)
 
@@ -197,11 +172,15 @@ target_include_directories(${TARGET} PUBLIC
     ${GGML_EXTRA_INCS}
     )
 
+message(STATUS, "GGML_EXTRA_LIBS=${GGML_EXTRA_LIBS}")
+
 if (MSVC)
     target_link_libraries(${TARGET} PUBLIC ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 else()
     target_link_libraries(${TARGET} PUBLIC m ${GGML_EXTRA_LIBS} ${CMAKE_THREAD_LIBS_INIT})
 endif()
+
+message(STATUS "BUILD_SHARED_LIBS=${BUILD_SHARED_LIBS}")
 
 if (BUILD_SHARED_LIBS)
     target_link_libraries(${TARGET} PUBLIC

@@ -151,8 +151,9 @@ if (GGML_OPENBLAS)
         message(STATUS "OpenBLAS found")
 
         add_compile_definitions(GGML_USE_OPENBLAS)
-        #add_link_options(${BLAS_LIBRARIES})
+        add_link_options(${BLAS_LIBRARIES})
         add_compile_options(${BLAS_LINKER_FLAGS})
+        message(STATUS "BLAS Link Flags:" ${BLAS_LINKER_FLAGS})
         set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} ${BLAS_LIBRARIES})
 
         # find header file
@@ -168,7 +169,7 @@ if (GGML_OPENBLAS)
             $ENV{OpenBLAS_HOME}/include
             )
 
-        include_directories(${BLAS_INCLUDE_DIRS})
+        #include_directories(${BLAS_INCLUDE_DIRS})
 
         find_path(OPENBLAS_INC NAMES cblas.h PATHS ${OPENBLAS_INCLUDE_SEARCH_PATHS})
         add_compile_options(-I${OPENBLAS_INC})
