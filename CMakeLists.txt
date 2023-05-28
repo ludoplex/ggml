@@ -151,7 +151,8 @@ if (GGML_OPENBLAS)
         message(STATUS "OpenBLAS found")
 
         add_compile_definitions(GGML_USE_OPENBLAS)
-        add_link_options(${BLAS_LIBRARIES})
+        #add_link_options(${BLAS_LIBRARIES})
+        add_compile_options(${BLAS_LINKER_FLAGS})
         set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} ${BLAS_LIBRARIES})
 
         # find header file
