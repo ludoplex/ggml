@@ -152,7 +152,7 @@ if (GGML_OPENBLAS)
 
         add_compile_definitions(GGML_USE_OPENBLAS)
         add_link_options(${BLAS_LIBRARIES})
-        set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} openblas)
+        set(GGML_EXTRA_LIBS ${GGML_EXTRA_LIBS} ${BLAS_LIBRARIES})
 
         # find header file
         set(OPENBLAS_INCLUDE_SEARCH_PATHS
