@@ -166,6 +166,9 @@ if (GGML_OPENBLAS)
             $ENV{OpenBLAS_HOME}
             $ENV{OpenBLAS_HOME}/include
             )
+
+        include_directories(${BLAS_INCLUDE_DIRS})
+
         find_path(OPENBLAS_INC NAMES cblas.h PATHS ${OPENBLAS_INCLUDE_SEARCH_PATHS})
         add_compile_options(-I${OPENBLAS_INC})
     else()
@@ -176,7 +179,7 @@ endif()
 if (NOT MSVC)
     if (GGML_STATIC)
         add_link_options(-static)
-        if (MINGW)
+        if (MINGW OR GGML_CUBLAS)
             add_link_options(-static-libgcc -static-libstdc++)
         endif()
     endif()
