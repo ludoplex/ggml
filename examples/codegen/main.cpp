@@ -12,7 +12,22 @@
 #include <string>
 #include <vector>
 #include <iostream>
+
+#ifdef _MSC_VER
+
+// https://stackoverflow.com/questions/74166084/what-is-the-windows-equivalent-of-posix-unistd-h-macro-stdin-fileno
+// If you are using the posix emulated APIs on Windows, such as _read and _write, you can safely pass 0, 1, and 2 
+// as stdin, stdout, and stderr file ids. Define your own macos as needed.
+
+/* Standard file descriptors.  */
+#define	STDIN_FILENO	0	/* Standard input.  */
+#define	STDOUT_FILENO	1	/* Standard output.  */
+#define	STDERR_FILENO	2	/* Standard error output.  */
+
+#else
 #include <unistd.h>
+#endif
+
 
 
 
