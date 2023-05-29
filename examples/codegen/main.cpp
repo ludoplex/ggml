@@ -26,8 +26,6 @@
 
 #include <io.h>
 
-auto isatty = _isatty;
-
 #else
 #include <unistd.h>
 #endif
