@@ -233,18 +233,18 @@ int main(int argc, char** argv) {
     });
 
 
-    CROW_ROUTE(app, "/v1/completions").methods(crow::HTTPMethod::POST)
+    CROW_ROUTE(app, "/v1/completions").methods(crow::HTTPMethod::Post)
     ([&model, &vocab, &params](const crow::request& req) {
         return serve_response(params, model, vocab, req);
     });
 
-    CROW_ROUTE(app, "/v1/engines/codegen/completions").methods(crow::HTTPMethod::POST)
+    CROW_ROUTE(app, "/v1/engines/codegen/completions").methods(crow::HTTPMethod::Post)
     ([&model, &vocab, &params](const crow::request& req) {
         return serve_response(params, model, vocab, req);
     });
 
 
-    CROW_ROUTE(app, "/v1/engines/copilot-codex/completions").methods(crow::HTTPMethod::POST)
+    CROW_ROUTE(app, "/v1/engines/copilot-codex/completions").methods(crow::HTTPMethod::Post)
     ([&model, &vocab, &params](const crow::request& req) {
         return serve_response(params, model, vocab, req);
     });
