@@ -24,6 +24,10 @@
 #define	STDOUT_FILENO	1	/* Standard output.  */
 #define	STDERR_FILENO	2	/* Standard error output.  */
 
+#include <io.h>
+
+auto isatty = _isatty;
+
 #else
 #include <unistd.h>
 #endif
