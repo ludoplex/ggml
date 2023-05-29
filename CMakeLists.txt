@@ -169,7 +169,7 @@ if (GGML_OPENBLAS)
             $ENV{OpenBLAS_HOME}/include
             )
 
-        #include_directories(${BLAS_INCLUDE_DIRS})
+        include_directories(${BLAS_INCLUDE_DIRS})
 
         find_path(OPENBLAS_INC NAMES cblas.h PATHS ${OPENBLAS_INCLUDE_SEARCH_PATHS})
         add_compile_options(-I${OPENBLAS_INC})
