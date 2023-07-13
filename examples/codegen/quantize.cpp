@@ -20,7 +20,7 @@ struct gptj_hparams {
     int32_t n_head  = 16;
     int32_t n_layer = 28;
     int32_t n_rot   = 64;
-    int32_t f16     = 1;
+    int32_t ftype     = 1;
 };
 
 // quantize a model
@@ -76,14 +76,14 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
         finp.read((char *) &hparams.n_head,  sizeof(hparams.n_head));
         finp.read((char *) &hparams.n_layer, sizeof(hparams.n_layer));
         finp.read((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
-        finp.read((char *) &hparams.f16,     sizeof(hparams.f16));
+        finp.read((char *) &hparams.ftype,     sizeof(hparams.ftype));
 
         printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
         printf("%s: n_ctx   = %d\n", __func__, hparams.n_ctx);
         printf("%s: n_embd  = %d\n", __func__, hparams.n_embd);
         printf("%s: n_head  = %d\n", __func__, hparams.n_head);
         printf("%s: n_layer = %d\n", __func__, hparams.n_layer);
-        printf("%s: f16     = %d\n", __func__, hparams.f16);
+        printf("%s: f16     = %d\n", __func__, hparams.ftype);
 
         fout.write((char *) &hparams.n_vocab, sizeof(hparams.n_vocab));
         fout.write((char *) &hparams.n_ctx,   sizeof(hparams.n_ctx));
@@ -91,7 +91,7 @@ bool gptj_model_quantize(const std::string & fname_inp, const std::string & fnam
         fout.write((char *) &hparams.n_head,  sizeof(hparams.n_head));
         fout.write((char *) &hparams.n_layer, sizeof(hparams.n_layer));
         fout.write((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
-        fout.write((char *) &itype,           sizeof(hparams.f16));
+        fout.write((char *) &itype,           sizeof(hparams.ftype));
     }
 
     // load vocab

@@ -88,15 +88,6 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
                 break;
             }
             params.top_k = std::stoi(argv[i]);
-        } else if (arg == "-c" || arg == "--ctx_size") {
-            if (++i >= argc) {
-                invalid_param = true;
-                break;
-            }
-            params.n_ctx = std::stoi(argv[i]);
-        } else if (arg == "--memory_f32") {
-            params.memory_f16 = false;
-            params.top_k = std::max(1, std::stoi(argv[++i]));
         } else if (arg == "--top_p") {
             if (++i >= argc) {
                 invalid_param = true;
@@ -133,12 +124,6 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
             }
             params.n_batch = std::stoi(argv[i]);
             params.n_batch = std::min(512, params.n_batch);
-        } else if (arg == "--keep") {
-            if (++i >= argc) {
-                invalid_param = true;
-                break;
-            }
-            params.n_keep = std::stoi(argv[i]);
         } else if (arg == "-m" || arg == "--model") {
             if (++i >= argc) {
                 invalid_param = true;
@@ -147,14 +132,7 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
             params.model = argv[i];
         } else if (arg == "--perplexity") {
             params.perplexity = true;
-        } else if (arg == "--n_parts") {
-            if (++i >= argc) {
-                invalid_param = true;
-                break;
-            }
-            params.n_parts = std::stoi(argv[i]);
-            params.model = argv[++i];
-        } else if (arg == "-i" || arg == "--interactive") {
+        }else if (arg == "-i" || arg == "--interactive") {
             params.interactive = true;
         } else if (arg == "-ip" || arg == "--interactive-port") {
             params.interactive = true;
@@ -162,8 +140,6 @@ bool gpt_params_parse(int argc, char ** argv, gpt_params & params) {
         } else if (arg == "-h" || arg == "--help") {
             gpt_print_usage(argc, argv, default_params);
             exit(0);
-        } else if (arg == "--random-prompt") {
-            params.random_prompt = true;
         } else if (arg == "-f" || arg == "--file") {
             if (++i > argc) {
                 fprintf(stderr, "Invalid file param");

@@ -17,7 +17,7 @@ struct gptj_hparams {
     int32_t n_head  = 16;
     int32_t n_layer = 28;
     int32_t n_rot   = 64;
-    int32_t f16     = 1;
+    int32_t ftype     = 1;
 };
 
 struct gptj_layer {
