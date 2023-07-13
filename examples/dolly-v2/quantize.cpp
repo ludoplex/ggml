@@ -13,19 +13,20 @@
 #include <vector>
 #include <regex>
 
-// default hparams (StableLM 3B)
-struct stablelm_hparams {
-    int32_t n_vocab = 50257;
-    int32_t n_ctx   = 4096;
-    int32_t n_embd  = 4096;
-    int32_t n_head  = 32;
-    int32_t n_layer = 16;
-    int32_t n_rot   = 32; // 0.25 * (n_embd / n_head)
-    int32_t ftype   = 1;
+// default hparams (dollyv2 3B)
+struct dollyv2_hparams {
+    int32_t n_vocab = 50254; // tokenizer.vocab_size
+    int32_t n_ctx   = 2048;  // model.config.max_position_embeddings
+    int32_t n_embd  = 2560;  // model.config.hidden_size
+    int32_t n_head  = 32;    // model.config.num_attention_heads
+    int32_t n_layer = 32;    // model.config.num_hidden_layers
+    int32_t n_rot   = 20;    // rotary_pct[25%] * (n_embd / n_head)
+    int32_t par_res = 1; // 1 = true, 0 = false
+    int32_t ftype   = GGML_FTYPE_MOSTLY_F16;
 };
 
 // quantize a model
-bool stablelm_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_mtype mtype) {
+bool dollyv2_model_quantize(const std::string & fname_inp, const std::string & fname_out, ggml_ftype ftype) {
     gpt_vocab vocab;
 
     printf("%s: loading model from '%s'\n", __func__, fname_inp.c_str());
@@ -46,7 +47,7 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
     {
         uint32_t magic;
         finp.read((char *) &magic, sizeof(magic));
-        if (magic != 0x67676d6c) {
+        if (magic != GGML_FILE_MAGIC) {
             fprintf(stderr, "%s: invalid model file '%s' (bad magic)\n", __func__, fname_inp.c_str());
             return false;
         }
@@ -54,7 +55,7 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
         fout.write((char *) &magic, sizeof(magic));
     }
 
-    stablelm_hparams hparams;
+    dollyv2_hparams hparams;
 
     // load hparams
     {
@@ -64,14 +65,22 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
         finp.read((char *) &hparams.n_head,  sizeof(hparams.n_head));
         finp.read((char *) &hparams.n_layer, sizeof(hparams.n_layer));
         finp.read((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
+        finp.read((char *) &hparams.par_res, sizeof(hparams.par_res));
         finp.read((char *) &hparams.ftype,   sizeof(hparams.ftype));
 
-        printf("%s: n_vocab = %d\n", __func__, hparams.n_vocab);
-        printf("%s: n_ctx   = %d\n", __func__, hparams.n_ctx);
-        printf("%s: n_embd  = %d\n", __func__, hparams.n_embd);
-        printf("%s: n_head  = %d\n", __func__, hparams.n_head);
-        printf("%s: n_layer = %d\n", __func__, hparams.n_layer);
-        printf("%s: ftype   = %d\n", __func__, hparams.ftype);
+        const int32_t qntvr_src =    hparams.ftype / GGML_QNT_VERSION_FACTOR;
+        const int32_t ftype_dst = GGML_QNT_VERSION * GGML_QNT_VERSION_FACTOR + ftype;
+
+        printf("%s: n_vocab     = %d\n", __func__, hparams.n_vocab);
+        printf("%s: n_ctx       = %d\n", __func__, hparams.n_ctx);
+        printf("%s: n_embd      = %d\n", __func__, hparams.n_embd);
+        printf("%s: n_head      = %d\n", __func__, hparams.n_head);
+        printf("%s: n_layer     = %d\n", __func__, hparams.n_layer);
+        printf("%s: par_res     = %d\n", __func__, hparams.par_res);
+        printf("%s: ftype (src) = %d\n", __func__, hparams.ftype);
+        printf("%s: qntvr (src) = %d\n", __func__, qntvr_src);
+        printf("%s: ftype (dst) = %d\n", __func__, ftype_dst);
+        printf("%s: qntvr (dst) = %d\n", __func__, GGML_QNT_VERSION);
 
         fout.write((char *) &hparams.n_vocab, sizeof(hparams.n_vocab));
         fout.write((char *) &hparams.n_ctx,   sizeof(hparams.n_ctx));
@@ -79,7 +88,8 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
         fout.write((char *) &hparams.n_head,  sizeof(hparams.n_head));
         fout.write((char *) &hparams.n_layer, sizeof(hparams.n_layer));
         fout.write((char *) &hparams.n_rot,   sizeof(hparams.n_rot));
-        fout.write((char *) &mtype,           sizeof(hparams.ftype));
+        fout.write((char *) &hparams.par_res, sizeof(hparams.par_res));
+        fout.write((char *) &ftype_dst,       sizeof(ftype_dst));
     }
 
     // load vocab
@@ -106,7 +116,7 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
         ".*weight",
     };
 
-    if (!ggml_common_quantize_0(finp, fout, mtype, to_quant, {})) {
+    if (!ggml_common_quantize_0(finp, fout, ftype, to_quant, {})) {
         fprintf(stderr, "%s: failed to quantize model '%s'\n", __func__, fname_inp.c_str());
         return false;
     }
@@ -118,15 +128,12 @@ bool stablelm_model_quantize(const std::string & fname_inp, const std::string & 
 }
 
 // usage:
-//  ./stablelm2-quantize models/stablelm2-117M/ggml-model.bin models/stablelm2-117M/ggml-model-quant.bin type
+//  ./dollyv2-quantize models/dolly-v2-3B/ggml-model.bin models/dolly-v2-3B/ggml-model-quant.bin type
 //
 int main(int argc, char ** argv) {
     if (argc != 4) {
         fprintf(stderr, "usage: %s model-f32.bin model-quant.bin type\n", argv[0]);
-        fprintf(stderr, "  type = 2 - q4_0\n");
-        fprintf(stderr, "  type = 3 - q4_1\n");
-        fprintf(stderr, "  type = 5 - q4_2\n");
-        fprintf(stderr, "  type = 6 - q4_3\n");
+        ggml_print_ftypes(stderr);
         return 1;
     }
 
@@ -140,7 +147,7 @@ int main(int argc, char ** argv) {
     const std::string fname_inp = argv[1];
     const std::string fname_out = argv[2];
 
-    const int mtype = atoi(argv[3]);
+    const ggml_ftype ftype = ggml_parse_ftype(argv[3]);
 
     const int64_t t_main_start_us = ggml_time_us();
 
@@ -150,7 +157,7 @@ int main(int argc, char ** argv) {
     {
         const int64_t t_start_us = ggml_time_us();
 
-        if (!stablelm_model_quantize(fname_inp, fname_out, ggml_mtype(mtype))) {
+        if (!dollyv2_model_quantize(fname_inp, fname_out, ggml_ftype(ftype))) {
             fprintf(stderr, "%s: failed to quantize model from '%s'\n", __func__, fname_inp.c_str());
             return 1;
         }

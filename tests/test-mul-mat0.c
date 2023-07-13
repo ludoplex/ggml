@@ -1,9 +1,15 @@
+#define _CRT_SECURE_NO_DEPRECATE // Disables ridiculous "unsafe" warnigns on Windows
 #include "ggml/ggml.h"
 
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <inttypes.h>
+
+#if defined(_MSC_VER)
+#pragma warning(disable: 4244 4267) // possible loss of data
+#endif
 
 #define MAX_NARGS 2
 
@@ -89,14 +95,15 @@ bool check_gradient(
         float eps,
         float max_error_abs,
         float max_error_rel) {
+    const int n_threads = 1;
 
     struct ggml_cgraph gf = ggml_build_forward (f);
     struct ggml_cgraph gb = ggml_build_backward(ctx0, &gf, false);
 
-    ggml_graph_compute(ctx0, &gf);
+    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
     ggml_graph_reset  (&gf);
     ggml_set_f32      (f->grad, 1.0f);
-    ggml_graph_compute(ctx0, &gb);
+    ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
 
     ggml_graph_dump_dot(&gf, NULL, "test-grad0-forward.dot");
     ggml_graph_dump_dot(&gb, &gf,  "test-grad0-backward.dot");
@@ -108,12 +115,12 @@ bool check_gradient(
             const float x0 = get_element(x[i], k);
 
             set_element(x[i], k, x0 + eps);
-            ggml_graph_compute(ctx0, &gf);
+            ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
             const float f0 = ggml_get_f32_1d(f, 0);
 
             set_element(x[i], k, x0 - eps);
-            ggml_graph_compute(ctx0, &gf);
+            ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
 
             const float f1 = ggml_get_f32_1d(f, 0);
 
@@ -124,7 +131,7 @@ bool check_gradient(
             // compute gradient using backward graph
             ggml_graph_reset  (&gf);
             ggml_set_f32      (f->grad, 1.0f);
-            ggml_graph_compute(ctx0, &gb);
+            ggml_graph_compute_with_ctx(ctx0, &gb, n_threads);
 
             const float g1 = get_element(x[i]->grad, k);
 
@@ -132,8 +139,7 @@ bool check_gradient(
             const float error_rel = g0 != 0 ? fabsf(g0 - g1)/fabs(g0) : 0;
 
             if (error_abs > max_error_abs || error_rel > max_error_rel) {
-                printf("%s: ndims=%d, i=%d, k=%lld, g0=%f, g1=%f, error_abs=%f, error_rel=%f\n",
-                        op_name, ndims, i, k, g0, g1, error_abs, error_rel);
+                printf("%s: ndims=%d, i=%d, k=%" PRId64 ", g0=%f, g1=%f, error_abs=%f, error_rel=%f\n", op_name, ndims, i, k, g0, g1, error_abs, error_rel);
                 assert(false);
             }
         }
@@ -176,7 +182,7 @@ bool check_mat_mul(
     const int64_t n22 = y->ne[2];
     const int64_t n32 = y->ne[3];
 
-    printf("x0: [%lld, %lld, %lld, %lld]\n", n00, n10, n20, n30);
+    printf("x0: [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n", n00, n10, n20, n30);
     for (int j = 0; j < n10; ++j) {
         for (int i = 0; i < n00; ++i) {
             printf("%6.3f ", mat_get(x0, i, j, 0, 0));
@@ -185,7 +191,7 @@ bool check_mat_mul(
     }
     printf("\n");
 
-    printf("x1: [%lld, %lld, %lld, %lld]\n", n01, n11, n21, n31);
+    printf("x1: [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n", n01, n11, n21, n31);
     for (int j = 0; j < n11; ++j) {
         for (int i = 0; i < n01; ++i) {
             printf("%6.3f ", mat_get(x1, i, j, 0, 0));
@@ -194,7 +200,7 @@ bool check_mat_mul(
     }
     printf("\n");
 
-    printf("y: [%lld, %lld, %lld, %lld]\n", n02, n12, n22, n32);
+    printf("y: [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n", n02, n12, n22, n32);
     for (int j = 0; j < n12; ++j) {
         for (int i = 0; i < n02; ++i) {
             printf("%6.3f ", mat_get(y, i, j, 0, 0));
@@ -242,6 +248,9 @@ int main(int argc, const char ** argv) {
     if (argc > 1) {
         niter = atoi(argv[1]);
     }
+
+    int n_threads = 1;
+
     for (int iter = 0; iter < niter; ++iter) {
         printf("test-mul-mat0: iter:%d/%d\n", iter, niter);
         struct ggml_context * ctx0 = ggml_init(params);
@@ -264,7 +273,7 @@ int main(int argc, const char ** argv) {
                 struct ggml_tensor * m = ggml_mul_mat(ctx0, x[1], x[0]);
                 struct ggml_tensor * f = ggml_sum(ctx0, m);
 
-                printf("testing: mul_mat, [%lld, %lld, %lld, %lld] = [%lld, %lld, %lld, %lld] * [%lld, %lld, %lld, %lld]\n",
+                printf("testing: mul_mat, [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] = [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] * [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n",
                            m->ne[0],    m->ne[1],    m->ne[2],    m->ne[3],
                         x[1]->ne[0], x[1]->ne[1], x[1]->ne[2], x[1]->ne[3],
                         x[0]->ne[0], x[0]->ne[1], x[0]->ne[2], x[0]->ne[3]);
@@ -278,7 +287,7 @@ int main(int argc, const char ** argv) {
                     check_gradient("mul_mat", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);
                 } else {
                     struct ggml_cgraph gf = ggml_build_forward(m);
-                    ggml_graph_compute(ctx0, &gf);
+                    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
                 }
 
                 check_mat_mul(m, x[1], x[0]);
@@ -300,7 +309,7 @@ int main(int argc, const char ** argv) {
                 struct ggml_tensor * m = ggml_mul_mat(ctx0, x[1], x[0]);
                 struct ggml_tensor * f = ggml_sum(ctx0, m);
 
-                printf("testing: mul_mat, [%lld, %lld, %lld, %lld] = [%lld, %lld, %lld, %lld] * [%lld, %lld, %lld, %lld]\n",
+                printf("testing: mul_mat, [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] = [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "] * [%" PRId64 ", %" PRId64 ", %" PRId64 ", %" PRId64 "]\n",
                            m->ne[0],    m->ne[1],    m->ne[2],    m->ne[3],
                         x[1]->ne[0], x[1]->ne[1], x[1]->ne[2], x[1]->ne[3],
                         x[0]->ne[0], x[0]->ne[1], x[0]->ne[2], x[0]->ne[3]);
@@ -314,7 +323,7 @@ int main(int argc, const char ** argv) {
                     check_gradient("mul_mat", ctx0, x, f, ndims, nargs, 1e-3f, 1e-3f, INFINITY);
                 } else {
                     struct ggml_cgraph gf = ggml_build_forward(m);
-                    ggml_graph_compute(ctx0, &gf);
+                    ggml_graph_compute_with_ctx(ctx0, &gf, n_threads);
                 }
 
                 check_mat_mul(m, x[1], x[0]);

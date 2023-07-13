@@ -30,6 +30,7 @@ option(GGML_BUILD_EXAMPLES          "ggml: build examples" ${GGML_STANDALONE})
 option(GGML_PERF                    "ggml: enable perf timings"          OFF)
 option(GGML_NO_ACCELERATE           "ggml: disable Accelerate framework" OFF)
 option(GGML_OPENBLAS                "ggml: use OpenBLAS"                 OFF)
+option(GGML_CLBLAST                 "ggml: use clBLAST"                  OFF)
 option(GGML_CUBLAS                  "ggml: use cuBLAS"                   OFF)
 
 # sanitizers
@@ -210,3 +211,9 @@ endif ()
 if (GGML_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif ()
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/ggml.pc.in
+               ${CMAKE_CURRENT_BINARY_DIR}/ggml.pc
+               @ONLY)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/ggml.pc
+        DESTINATION share/pkgconfig)

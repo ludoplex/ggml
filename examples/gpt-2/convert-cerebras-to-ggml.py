@@ -10,7 +10,7 @@ import torch
 import numpy as np
 import re
 
-from transformers import GPTJForCausalLM, AutoModelForCausalLM
+from transformers import AutoModelForCausalLM
 
 # ref: https://github.com/openai/gpt-2/blob/master/src/encoder.py
 def bytes_to_unicode():
@@ -35,7 +35,7 @@ def bytes_to_unicode():
     return dict(zip(bs, cs))
 
 if len(sys.argv) < 2:
-    print("Usage: convert-h5-to-ggml.py dir-model [use-f32]\n")
+    print("Usage: convert-cerebras-to-ggml.py dir-model [use-f32]\n")
     sys.exit(1)
 
 # output in the same directory as the model

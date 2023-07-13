@@ -1,3 +1,16 @@
+if (GGML_ALL_WARNINGS)
+  if (NOT MSVC)
+      set(cxx_flags
+          # TODO(marella): Add other warnings.
+          -Wpedantic
+          -Wunused-variable
+          -Wno-unused-function
+          -Wno-multichar
+      )
+      add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:${cxx_flags}>")
+  endif()
+endif()
+
 add_library(common STATIC common.cpp)
 target_include_directories(common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -10,5 +23,8 @@ add_subdirectory(gpt-j)
 add_subdirectory(whisper)
 add_subdirectory(codegen)
 add_subdirectory(mnist)
-add_subdirectory(stablelm)
-#add_subdirectory(perplexity)
+add_subdirectory(gpt-neox)
+add_subdirectory(dolly-v2)
+add_subdirectory(replit)
+add_subdirectory(mpt)
+add_subdirectory(starcoder)
