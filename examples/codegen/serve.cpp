@@ -174,7 +174,7 @@ crow::response serve_response(gpt_params params, gptj_model &model, gpt_vocab &v
 }
 
 int main(int argc, char** argv) {
-
+    ggml_time_init();
     gpt_params params;
     params.model = "models/gpt-j-6B/ggml-model.bin";
 
