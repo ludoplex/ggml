@@ -51,7 +51,7 @@ def convert_to_ftype(data, ftype):
     if ftype == 1:
         return data.astype(np.float16)
 
-    assert False, "Invalid ftype: " + str(ftype)
+    assert False, f"Invalid ftype: {str(ftype)}"
 
 if len(sys.argv) < 3:
     print("Usage: convert-ckpt-to-ggml.py dir-model ftype\n")
@@ -61,12 +61,12 @@ if len(sys.argv) < 3:
 
 # output in the same directory as the model
 dir_model = sys.argv[1]
-fname_out = sys.argv[1] + "/ggml-model.bin"
+fname_out = f"{sys.argv[1]}/ggml-model.bin"
 
-with open(dir_model + "/encoder.json", "r", encoding="utf-8") as f:
+with open(f"{dir_model}/encoder.json", "r", encoding="utf-8") as f:
     encoder = json.load(f)
 
-with open(dir_model + "/hparams.json", "r", encoding="utf-8") as f:
+with open(f"{dir_model}/hparams.json", "r", encoding="utf-8") as f:
     hparams = json.load(f)
 
 # possible data types
@@ -80,80 +80,71 @@ ftype = 1
 if len(sys.argv) > 2:
     ftype = int(sys.argv[2])
     if ftype < 0 or ftype > 1:
-        print("Invalid ftype: " + str(ftype))
+        print(f"Invalid ftype: {ftype}")
         sys.exit(1)
-    fname_out = sys.argv[1] + "/ggml-model-" + ftype_str[ftype] + ".bin"
+    fname_out = f"{sys.argv[1]}/ggml-model-{ftype_str[ftype]}.bin"
 
 list_vars = tf.train.list_variables(dir_model)
 
-fout = open(fname_out, "wb")
+with open(fname_out, "wb") as fout:
+    fout.write(struct.pack("i", 0x67676d6c)) # magic: ggml in hex
+    fout.write(struct.pack("i", hparams["n_vocab"]))
+    fout.write(struct.pack("i", hparams["n_ctx"]))
+    fout.write(struct.pack("i", hparams["n_embd"]))
+    fout.write(struct.pack("i", hparams["n_head"]))
+    fout.write(struct.pack("i", hparams["n_layer"]))
+    fout.write(struct.pack("i", ftype))
 
-fout.write(struct.pack("i", 0x67676d6c)) # magic: ggml in hex
-fout.write(struct.pack("i", hparams["n_vocab"]))
-fout.write(struct.pack("i", hparams["n_ctx"]))
-fout.write(struct.pack("i", hparams["n_embd"]))
-fout.write(struct.pack("i", hparams["n_head"]))
-fout.write(struct.pack("i", hparams["n_layer"]))
-fout.write(struct.pack("i", ftype))
+    byte_encoder = bytes_to_unicode()
+    byte_decoder = {v:k for k, v in byte_encoder.items()}
 
-byte_encoder = bytes_to_unicode()
-byte_decoder = {v:k for k, v in byte_encoder.items()}
+    fout.write(struct.pack("i", len(encoder)))
 
-fout.write(struct.pack("i", len(encoder)))
+    for key in encoder:
+        text = bytearray([byte_decoder[c] for c in key])
+        fout.write(struct.pack("i", len(text)))
+        fout.write(text)
 
-for key in encoder:
-    text = bytearray([byte_decoder[c] for c in key])
-    fout.write(struct.pack("i", len(text)))
-    fout.write(text)
+    for name, shape in list_vars:
+        print(f"Processing variable: {name} with shape: ", shape)
 
-for name, shape in list_vars:
-    print("Processing variable: " + name + " with shape: ", shape)
+        data = tf.train.load_variable(dir_model, name).squeeze()
+        n_dims = len(data.shape);
 
-    data = tf.train.load_variable(dir_model, name).squeeze()
-    n_dims = len(data.shape);
+        # for efficiency - transpose the projection matrices
+        # "model/h.*/attn/c_attn/w"
+        # "model/h.*/attn/c_proj/w"
+        # "model/h.*/mlp/c_fc/w"
+        # "model/h.*/mlp/c_proj/w"
+        if name[-14:] == "/attn/c_attn/w" or \
+           name[-14:] == "/attn/c_proj/w" or \
+           name[-11:] == "/mlp/c_fc/w" or \
+           name[-13:] == "/mlp/c_proj/w":
+            print("  Transposing")
+            data = data.transpose()
 
-    # for efficiency - transpose the projection matrices
-    # "model/h.*/attn/c_attn/w"
-    # "model/h.*/attn/c_proj/w"
-    # "model/h.*/mlp/c_fc/w"
-    # "model/h.*/mlp/c_proj/w"
-    if name[-14:] == "/attn/c_attn/w" or \
-       name[-14:] == "/attn/c_proj/w" or \
-       name[-11:] == "/mlp/c_fc/w" or \
-       name[-13:] == "/mlp/c_proj/w":
-        print("  Transposing")
-        data = data.transpose()
+        dshape = data.shape
 
-    dshape = data.shape
+        ftype_cur = 0
+        if ftype != 0:
+            if name == "model/wte" or name[-2:] == "/w":
+                print(f"  Converting to {ftype_str[ftype]}")
+                data = convert_to_ftype(data, ftype)
+                ftype_cur = ftype
+            else:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+                ftype_cur = 0
 
-    ftype_cur = 0
-    if ftype != 0:
-        # match name:
-        #  "model/wte"
-        #  "model/h.*/attn/c_attn/w"
-        #  "model/h.*/attn/c_proj/w"
-        #  "model/h.*/mlp/c_fc/w"
-        #  "model/h.*/mlp/c_proj/w"
-        if name == "model/wte" or name[-2:] == "/w":
-            print("  Converting to " + ftype_str[ftype])
-            data = convert_to_ftype(data, ftype)
-            ftype_cur = ftype
-        else:
-            print("  Converting to float32")
-            data = data.astype(np.float32)
-            ftype_cur = 0
+        # header
+        str = name.encode('utf-8')
+        fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
+        for i in range(n_dims):
+            fout.write(struct.pack("i", dshape[n_dims - 1 - i]))
+        fout.write(str);
 
-    # header
-    str = name.encode('utf-8')
-    fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
-    for i in range(n_dims):
-        fout.write(struct.pack("i", dshape[n_dims - 1 - i]))
-    fout.write(str);
+        # data
+        data.tofile(fout)
 
-    # data
-    data.tofile(fout)
-
-fout.close()
-
-print("Done. Output file: " + fname_out)
+print(f"Done. Output file: {fname_out}")
 print("")

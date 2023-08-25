@@ -38,26 +38,23 @@ state_dict = torch.load(state_dict_file, map_location=torch.device('cpu'))
 list_vars = state_dict
 print (list_vars)
 
-fout = open(fname_out, "wb")
+with open(fname_out, "wb") as fout:
+    fout.write(struct.pack("i", 0x67676d6c)) # magic: ggml in hex
 
-fout.write(struct.pack("i", 0x67676d6c)) # magic: ggml in hex
 
+    for name in list_vars.keys():
+        data = list_vars[name].squeeze().numpy()
+        print(f"Processing variable: {name} with shape: ", data.shape)
+        n_dims = len(data.shape);
 
-for name in list_vars.keys():
-    data = list_vars[name].squeeze().numpy()
-    print("Processing variable: " + name + " with shape: ", data.shape) 
-    n_dims = len(data.shape);
-   
-    fout.write(struct.pack("i", n_dims))
-    
-    data = data.astype(np.float32)
-    for i in range(n_dims):
-        fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
+        fout.write(struct.pack("i", n_dims))
 
-    # data
-    data.tofile(fout)
+        data = data.astype(np.float32)
+        for i in range(n_dims):
+            fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
 
-fout.close()
+        # data
+        data.tofile(fout)
 
-print("Done. Output file: " + fname_out)
+print(f"Done. Output file: {fname_out}")
 print("")

@@ -203,7 +203,7 @@ try:
     with io.BytesIO(model_bytes) as fp:
         checkpoint = torch.load(fp, map_location="cpu")
 except:
-    print("Error: failed to load PyTorch model file: %s" % fname_inp)
+    print(f"Error: failed to load PyTorch model file: {fname_inp}")
     sys.exit(1)
 
 hparams = checkpoint["dims"]
@@ -232,96 +232,91 @@ tokenizer = build_tokenizer(dir_whisper, multilingual and "multilingual" or "gpt
 dir_tokenizer = tokenizer.name_or_path
 
 # output in the same directory as the model
-fname_out = dir_out + "/ggml-model.bin"
+fname_out = f"{dir_out}/ggml-model.bin"
 
-with open(dir_tokenizer + "/vocab.json", "r") as f:
+with open(f"{dir_tokenizer}/vocab.json", "r") as f:
     tokens = json.load(f)
 
 # use 16-bit or 32-bit floats
 use_f16 = True
 if len(sys.argv) > 4:
     use_f16 = False
-    fname_out = dir_out + "/ggml-model-f32.bin"
+    fname_out = f"{dir_out}/ggml-model-f32.bin"
 
-fout = open(fname_out, "wb")
+with open(fname_out, "wb") as fout:
+    fout.write(struct.pack("i", 0x67676d6c)) # magic: ggml in hex
+    fout.write(struct.pack("i", hparams["n_vocab"]))
+    fout.write(struct.pack("i", hparams["n_audio_ctx"]))
+    fout.write(struct.pack("i", hparams["n_audio_state"]))
+    fout.write(struct.pack("i", hparams["n_audio_head"]))
+    fout.write(struct.pack("i", hparams["n_audio_layer"]))
+    fout.write(struct.pack("i", hparams["n_text_ctx"]))
+    fout.write(struct.pack("i", hparams["n_text_state"]))
+    fout.write(struct.pack("i", hparams["n_text_head"]))
+    fout.write(struct.pack("i", hparams["n_text_layer"]))
+    fout.write(struct.pack("i", hparams["n_mels"]))
+    fout.write(struct.pack("i", use_f16))
 
-fout.write(struct.pack("i", 0x67676d6c)) # magic: ggml in hex
-fout.write(struct.pack("i", hparams["n_vocab"]))
-fout.write(struct.pack("i", hparams["n_audio_ctx"]))
-fout.write(struct.pack("i", hparams["n_audio_state"]))
-fout.write(struct.pack("i", hparams["n_audio_head"]))
-fout.write(struct.pack("i", hparams["n_audio_layer"]))
-fout.write(struct.pack("i", hparams["n_text_ctx"]))
-fout.write(struct.pack("i", hparams["n_text_state"]))
-fout.write(struct.pack("i", hparams["n_text_head"]))
-fout.write(struct.pack("i", hparams["n_text_layer"]))
-fout.write(struct.pack("i", hparams["n_mels"]))
-fout.write(struct.pack("i", use_f16))
+    # write mel filters
+    fout.write(struct.pack("i", filters.shape[0]))
+    fout.write(struct.pack("i", filters.shape[1]))
+    for i in range(filters.shape[0]):
+        for j in range(filters.shape[1]):
+            fout.write(struct.pack("f", filters[i][j]))
 
-# write mel filters
-fout.write(struct.pack("i", filters.shape[0]))
-fout.write(struct.pack("i", filters.shape[1]))
-for i in range(filters.shape[0]):
-    for j in range(filters.shape[1]):
-        fout.write(struct.pack("f", filters[i][j]))
+    byte_encoder = bytes_to_unicode()
+    byte_decoder = {v:k for k, v in byte_encoder.items()}
 
-byte_encoder = bytes_to_unicode()
-byte_decoder = {v:k for k, v in byte_encoder.items()}
+    fout.write(struct.pack("i", len(tokens)))
 
-fout.write(struct.pack("i", len(tokens)))
+    for key in tokens:
+        text = bytearray([byte_decoder[c] for c in key])
+        fout.write(struct.pack("i", len(text)))
+        fout.write(text)
 
-for key in tokens:
-    text = bytearray([byte_decoder[c] for c in key])
-    fout.write(struct.pack("i", len(text)))
-    fout.write(text)
+    for name in list_vars.keys():
+        data = list_vars[name].squeeze().numpy()
+        print(f"Processing variable: {name} with shape: ", data.shape)
 
-for name in list_vars.keys():
-    data = list_vars[name].squeeze().numpy()
-    print("Processing variable: " + name + " with shape: ", data.shape)
+            # reshape conv bias from [n] to [n, 1]
+        if name in ["encoder.conv1.bias", "encoder.conv2.bias"]:
+            data = data.reshape(data.shape[0], 1)
+            print(f"  Reshaped variable: {name} to shape: ", data.shape)
 
-    # reshape conv bias from [n] to [n, 1]
-    if name == "encoder.conv1.bias" or \
-       name == "encoder.conv2.bias":
-        data = data.reshape(data.shape[0], 1)
-        print("  Reshaped variable: " + name + " to shape: ", data.shape)
+        n_dims = len(data.shape);
 
-    n_dims = len(data.shape);
-
-    # looks like the whisper models are in f16 by default
-    # so we need to convert the small tensors to f32 until we fully support f16 in ggml
-    # ftype == 0 -> float32, ftype == 1 -> float16
-    ftype = 1;
-    if use_f16:
-        if n_dims < 2 or \
-                name == "encoder.conv1.bias"   or \
-                name == "encoder.conv2.bias"   or \
-                name == "encoder.positional_embedding" or \
-                name == "decoder.positional_embedding":
-            print("  Converting to float32")
-            data = data.astype(np.float32)
-            ftype = 0
-    else:
-        if n_dims < 3 and data.dtype != np.float32:
+        # looks like the whisper models are in f16 by default
+        # so we need to convert the small tensors to f32 until we fully support f16 in ggml
+        # ftype == 0 -> float32, ftype == 1 -> float16
+        ftype = 1;
+        if use_f16:
+            if n_dims < 2 or \
+                    name == "encoder.conv1.bias"   or \
+                    name == "encoder.conv2.bias"   or \
+                    name == "encoder.positional_embedding" or \
+                    name == "decoder.positional_embedding":
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+                ftype = 0
+        elif n_dims < 3 and data.dtype != np.float32:
             data = data.astype(np.float32)
             ftype = 0
 
-    #if name.startswith("encoder"):
-    #    if name.endswith("mlp.0.weight") or \
-    #       name.endswith("mlp.2.weight"):
-    #        print("  Transposing")
-    #        data = data.transpose()
+        #if name.startswith("encoder"):
+        #    if name.endswith("mlp.0.weight") or \
+        #       name.endswith("mlp.2.weight"):
+        #        print("  Transposing")
+        #        data = data.transpose()
 
-    # header
-    str = name.encode('utf-8')
-    fout.write(struct.pack("iii", n_dims, len(str), ftype))
-    for i in range(n_dims):
-        fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
-    fout.write(str);
+        # header
+        str = name.encode('utf-8')
+        fout.write(struct.pack("iii", n_dims, len(str), ftype))
+        for i in range(n_dims):
+            fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
+        fout.write(str);
 
-    # data
-    data.tofile(fout)
+        # data
+        data.tofile(fout)
 
-fout.close()
-
-print("Done. Output file: " + fname_out)
+print(f"Done. Output file: {fname_out}")
 print("")

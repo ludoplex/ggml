@@ -15,10 +15,10 @@ if len(sys.argv) < 3:
 
 # output in the same directory as the model
 dir_model = sys.argv[1]
-fname_out = sys.argv[1] + "/ggml-model.bin"
+fname_out = f"{sys.argv[1]}/ggml-model.bin"
 
 
-with open(dir_model + "/config.json", "r", encoding="utf-8") as f:
+with open(f"{dir_model}/config.json", "r", encoding="utf-8") as f:
     hparams = json.load(f)
 
 sp_proto = model.ModelProto()
@@ -36,9 +36,9 @@ ftype = 1
 if len(sys.argv) > 2:
     ftype = int(sys.argv[2])
     if ftype < 0 or ftype > 1:
-        print("Invalid ftype: " + str(ftype))
+        print(f"Invalid ftype: {ftype}")
         sys.exit(1)
-    fname_out = sys.argv[1] + "/ggml-model-" + ftype_str[ftype] + ".bin"
+    fname_out = f"{sys.argv[1]}/ggml-model-{ftype_str[ftype]}.bin"
 
 
 tokenizer = AutoTokenizer.from_pretrained(dir_model, trust_remote_code=True)
@@ -53,41 +53,45 @@ list_vars = model.state_dict()
 for name in list_vars.keys():
     print(name, list_vars[name].shape, list_vars[name].dtype)
 
-fout = open(fname_out, "wb")
+with open(fname_out, "wb") as fout:
+    print(hparams)
 
-print(hparams)
-
-fout.write(struct.pack("i", 0x67676D6C))  # magic: ggml in hex
-fout.write(struct.pack("i", hparams["d_model"]))
-fout.write(struct.pack("i", hparams["max_seq_len"]))
-fout.write(struct.pack("i", hparams["n_heads"]))
-fout.write(struct.pack("i", hparams["n_layers"]))
-fout.write(struct.pack("i", hparams["vocab_size"]))
-fout.write(struct.pack("i", ftype))
+    fout.write(struct.pack("i", 0x67676D6C))  # magic: ggml in hex
+    fout.write(struct.pack("i", hparams["d_model"]))
+    fout.write(struct.pack("i", hparams["max_seq_len"]))
+    fout.write(struct.pack("i", hparams["n_heads"]))
+    fout.write(struct.pack("i", hparams["n_layers"]))
+    fout.write(struct.pack("i", hparams["vocab_size"]))
+    fout.write(struct.pack("i", ftype))
 
 
-# TODO: temporary hack to not deal with implementing the tokenizer
-for piece in sp_proto.pieces:
-    encoded_piece = piece.piece.encode("utf-8")
-    fout.write(struct.pack("i", len(encoded_piece)))
-    fout.write(encoded_piece)
-    fout.write(struct.pack("f", piece.score))
+    # TODO: temporary hack to not deal with implementing the tokenizer
+    for piece in sp_proto.pieces:
+        encoded_piece = piece.piece.encode("utf-8")
+        fout.write(struct.pack("i", len(encoded_piece)))
+        fout.write(encoded_piece)
+        fout.write(struct.pack("f", piece.score))
 
-if hparams["vocab_size"] > len(sp_proto.pieces):
-    for i in range(hparams["vocab_size"] - len(sp_proto.pieces)):
-        fout.write(struct.pack("i", 0))
-        fout.write(struct.pack("f", 0))
+    if hparams["vocab_size"] > len(sp_proto.pieces):
+        for _ in range(hparams["vocab_size"] - len(sp_proto.pieces)):
+            fout.write(struct.pack("i", 0))
+            fout.write(struct.pack("f", 0))
 
-for name in list_vars.keys():
-    data = list_vars[name].squeeze().numpy()
-    print("Processing variable: " + name + " with shape: ", data.shape)
+    for name in list_vars.keys():
+        data = list_vars[name].squeeze().numpy()
+        print(f"Processing variable: {name} with shape: ", data.shape)
 
-    n_dims = len(data.shape)
+        n_dims = len(data.shape)
 
-    # ftype == 0 -> float32, ftype == 1 -> float16
-    ftype_cur = 0
-    if ftype != 0:
-        if name[-7:] == ".weight" and n_dims == 2:
+        # ftype == 0 -> float32, ftype == 1 -> float16
+        ftype_cur = 0
+        if ftype == 0:
+            if data.dtype != np.float32:
+                print("  Converting to float32")
+                data = data.astype(np.float32)
+                ftype_cur = 0
+
+        elif name[-7:] == ".weight" and n_dims == 2:
             print("  Converting to float16")
             data = data.astype(np.float16)
             ftype_cur = 1
@@ -95,23 +99,15 @@ for name in list_vars.keys():
             print("  Converting to float32")
             data = data.astype(np.float32)
             ftype_cur = 0
-    else:
-        if data.dtype != np.float32:
-            print("  Converting to float32")
-            data = data.astype(np.float32)
-            ftype_cur = 0
+        # header
+        str = name.encode("utf-8")
+        fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
+        for i in range(n_dims):
+            fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
+        fout.write(str)
 
-    # header
-    str = name.encode("utf-8")
-    fout.write(struct.pack("iii", n_dims, len(str), ftype_cur))
-    for i in range(n_dims):
-        fout.write(struct.pack("i", data.shape[n_dims - 1 - i]))
-    fout.write(str)
+        # data
+        data.tofile(fout)
 
-    # data
-    data.tofile(fout)
-
-fout.close()
-
-print("Done. Output file: " + fname_out)
+print(f"Done. Output file: {fname_out}")
 print("")

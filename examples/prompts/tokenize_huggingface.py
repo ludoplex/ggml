@@ -60,6 +60,11 @@ for repo in list_repo_hf:
             tokens = tokenizer.convert_tokens_to_ids(tokenizer.tokenize(sentence))
             tokens_hf.append((sentence, tokens))
 
-    save_txt = repo2ggml[repo] + ".txt"
+    save_txt = f"{repo2ggml[repo]}.txt"
     with open(save_txt, "w") as f:
-        f.writelines([sentence + " => " + ",".join(str(t) for t in tokens) + "\n" for sentence, tokens in tokens_hf])
+        f.writelines(
+            [
+                f"{sentence} => " + ",".join(str(t) for t in tokens) + "\n"
+                for sentence, tokens in tokens_hf
+            ]
+        )
